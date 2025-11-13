@@ -71,6 +71,8 @@ bool directMemoryAccess();
 void setDirectMemoryAccess(bool enable, bool is_game_specific = false);
 bool dumpShaders();
 void setDumpShaders(bool enable, bool is_game_specific = false);
+bool shaderCacheEnabled();
+void setShaderCacheEnabled(bool enable, bool is_game_specific = false);
 u32 vblankFreq();
 void setVblankFreq(u32 value, bool is_game_specific = false);
 bool getisTrophyPopupDisabled();

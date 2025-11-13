@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <ranges>
+#include <xxhash.h>
 
 #include "common/config.h"
 #include "common/hash.h"
@@ -266,13 +267,20 @@ PipelineCache::PipelineCache(const Instance& instance_, Scheduler& scheduler_,
         .max_viewport_height = instance.GetMaxViewportHeight(),
         .max_shared_memory_size = instance.MaxComputeSharedMemorySize(),
     };
-    auto [cache_result, cache] = instance.GetDevice().createPipelineCacheUnique({});
-    ASSERT_MSG(cache_result == vk::Result::eSuccess, "Failed to create pipeline cache: {}",
-               vk::to_string(cache_result));
-    pipeline_cache = std::move(cache);
+
+    // Initialize shader cache
+    const auto cache_dir = Common::FS::GetUserPath(Common::FS::PathType::ShaderDir) / "cache";
+    constexpr u32 CACHE_VERSION = 1; // Increment this when cache format changes
+    shader_cache = std::make_unique<ShaderCache>(cache_dir, CACHE_VERSION);
+
+    // Load Vulkan pipeline cache from disk
+    LoadVulkanPipelineCache();
 }
 
-PipelineCache::~PipelineCache() = default;
+PipelineCache::~PipelineCache() {
+    // Save Vulkan pipeline cache to disk
+    SaveVulkanPipelineCache();
+}
 
 const GraphicsPipeline* PipelineCache::GetGraphicsPipeline() {
     if (!RefreshGraphicsKey()) {
@@ -522,8 +530,41 @@ vk::ShaderModule PipelineCache::CompileModule(Shader::Info& info, Shader::Runtim
              perm_idx != 0 ? "(permutation)" : "");
     DumpShader(code, info.pgm_hash, info.stage, perm_idx, "bin");
 
-    const auto ir_program = Shader::TranslateProgram(code, pools, info, runtime_info, profile);
-    auto spv = Shader::Backend::SPIRV::EmitSPIRV(profile, runtime_info, ir_program, binding);
+    // Try to load from SPIR-V cache first
+    std::vector<u32> spv;
+    bool from_cache = false;
+
+    if (shader_cache && shader_cache->IsEnabled()) {
+        const ShaderCache::CacheKey cache_key{
+            .shader_hash = info.pgm_hash,
+            .runtime_hash = HashRuntimeInfo(runtime_info),
+            .permutation_idx = perm_idx,
+        };
+
+        auto cached_spv = shader_cache->Load(cache_key);
+        if (cached_spv) {
+            spv = std::move(*cached_spv);
+            from_cache = true;
+            LOG_INFO(Render_Vulkan, "Loaded {} shader {:#x} from cache", info.stage, info.pgm_hash);
+        }
+    }
+
+    // If not in cache, compile from scratch
+    if (!from_cache) {
+        const auto ir_program = Shader::TranslateProgram(code, pools, info, runtime_info, profile);
+        spv = Shader::Backend::SPIRV::EmitSPIRV(profile, runtime_info, ir_program, binding);
+
+        // Save to cache for future use
+        if (shader_cache && shader_cache->IsEnabled()) {
+            const ShaderCache::CacheKey cache_key{
+                .shader_hash = info.pgm_hash,
+                .runtime_hash = HashRuntimeInfo(runtime_info),
+                .permutation_idx = perm_idx,
+            };
+            shader_cache->Save(cache_key, spv);
+        }
+    }
+
     DumpShader(spv, info.pgm_hash, info.stage, perm_idx, "spv");
 
     vk::ShaderModule module;
@@ -654,6 +695,162 @@ std::optional<std::vector<u32>> PipelineCache::GetShaderPatch(u64 hash, Shader::
     std::vector<u32> code(file.GetSize() / sizeof(u32));
     file.Read(code);
     return code;
+}
+
+u64 PipelineCache::HashRuntimeInfo(const Shader::RuntimeInfo& runtime_info) {
+    // Hash the runtime info structure for cache key generation
+    // We use XXH3 for fast and high-quality hashing
+    XXH3_state_t state;
+    XXH3_64bits_reset(&state);
+
+    // Hash common fields
+    XXH3_64bits_update(&state, &runtime_info.stage, sizeof(runtime_info.stage));
+    XXH3_64bits_update(&state, &runtime_info.num_user_data, sizeof(runtime_info.num_user_data));
+    XXH3_64bits_update(&state, &runtime_info.num_input_vgprs, sizeof(runtime_info.num_input_vgprs));
+    XXH3_64bits_update(&state, &runtime_info.num_allocated_vgprs, sizeof(runtime_info.num_allocated_vgprs));
+    XXH3_64bits_update(&state, &runtime_info.fp_denorm_mode32, sizeof(runtime_info.fp_denorm_mode32));
+    XXH3_64bits_update(&state, &runtime_info.fp_round_mode32, sizeof(runtime_info.fp_round_mode32));
+
+    // Hash stage-specific info
+    switch (runtime_info.stage) {
+    case Stage::Fragment:
+        XXH3_64bits_update(&state, &runtime_info.fs_info, sizeof(runtime_info.fs_info));
+        break;
+    case Stage::Vertex:
+        XXH3_64bits_update(&state, &runtime_info.vs_info, sizeof(runtime_info.vs_info));
+        break;
+    case Stage::Compute:
+        XXH3_64bits_update(&state, &runtime_info.cs_info, sizeof(runtime_info.cs_info));
+        break;
+    case Stage::Export:
+        XXH3_64bits_update(&state, &runtime_info.es_info, sizeof(runtime_info.es_info));
+        break;
+    case Stage::Geometry:
+        // For geometry shader, we need to be careful with the span
+        XXH3_64bits_update(&state, &runtime_info.gs_info.num_outputs, sizeof(runtime_info.gs_info.num_outputs));
+        XXH3_64bits_update(&state, &runtime_info.gs_info.outputs, sizeof(runtime_info.gs_info.outputs));
+        XXH3_64bits_update(&state, &runtime_info.gs_info.num_invocations, sizeof(runtime_info.gs_info.num_invocations));
+        XXH3_64bits_update(&state, &runtime_info.gs_info.output_vertices, sizeof(runtime_info.gs_info.output_vertices));
+        XXH3_64bits_update(&state, &runtime_info.gs_info.in_vertex_data_size, sizeof(runtime_info.gs_info.in_vertex_data_size));
+        XXH3_64bits_update(&state, &runtime_info.gs_info.out_vertex_data_size, sizeof(runtime_info.gs_info.out_vertex_data_size));
+        XXH3_64bits_update(&state, &runtime_info.gs_info.in_primitive, sizeof(runtime_info.gs_info.in_primitive));
+        XXH3_64bits_update(&state, &runtime_info.gs_info.out_primitive, sizeof(runtime_info.gs_info.out_primitive));
+        XXH3_64bits_update(&state, &runtime_info.gs_info.mode, sizeof(runtime_info.gs_info.mode));
+        XXH3_64bits_update(&state, &runtime_info.gs_info.vs_copy_hash, sizeof(runtime_info.gs_info.vs_copy_hash));
+        break;
+    case Stage::Hull:
+        XXH3_64bits_update(&state, &runtime_info.hs_info, sizeof(runtime_info.hs_info));
+        break;
+    case Stage::Local:
+        XXH3_64bits_update(&state, &runtime_info.ls_info, sizeof(runtime_info.ls_info));
+        break;
+    }
+
+    return XXH3_64bits_digest(&state);
+}
+
+void PipelineCache::LoadVulkanPipelineCache() {
+    using namespace Common::FS;
+
+    const auto cache_dir = GetUserPath(PathType::ShaderDir) / "cache";
+    const auto pipeline_cache_path = cache_dir / "pipeline_cache.bin";
+
+    if (!std::filesystem::exists(pipeline_cache_path)) {
+        // No existing cache, create a new one
+        auto [result, cache] = instance.GetDevice().createPipelineCacheUnique({});
+        ASSERT_MSG(result == vk::Result::eSuccess, "Failed to create pipeline cache: {}",
+                   vk::to_string(result));
+        pipeline_cache = std::move(cache);
+        LOG_INFO(Render_Vulkan, "Created new Vulkan pipeline cache");
+        return;
+    }
+
+    try {
+        IOFile file(pipeline_cache_path, FileAccessMode::Read);
+        if (!file.IsOpen()) {
+            LOG_WARNING(Render_Vulkan, "Failed to open pipeline cache file");
+            auto [result, cache] = instance.GetDevice().createPipelineCacheUnique({});
+            pipeline_cache = std::move(cache);
+            return;
+        }
+
+        const auto file_size = file.GetSize();
+        std::vector<u8> cache_data(file_size);
+        const size_t bytes_read = file.ReadRaw<u8>(cache_data.data(), file_size);
+
+        if (bytes_read != file_size) {
+            LOG_WARNING(Render_Vulkan, "Failed to read pipeline cache data");
+            auto [result, cache] = instance.GetDevice().createPipelineCacheUnique({});
+            pipeline_cache = std::move(cache);
+            return;
+        }
+
+        vk::PipelineCacheCreateInfo cache_info{
+            .initialDataSize = cache_data.size(),
+            .pInitialData = cache_data.data(),
+        };
+
+        auto [result, cache] = instance.GetDevice().createPipelineCacheUnique(cache_info);
+        if (result != vk::Result::eSuccess) {
+            LOG_WARNING(Render_Vulkan, "Failed to create pipeline cache from file: {}",
+                       vk::to_string(result));
+            // Create empty cache as fallback
+            auto [fallback_result, fallback_cache] = instance.GetDevice().createPipelineCacheUnique({});
+            pipeline_cache = std::move(fallback_cache);
+            return;
+        }
+
+        pipeline_cache = std::move(cache);
+        LOG_INFO(Render_Vulkan, "Loaded Vulkan pipeline cache ({} KB)", file_size / 1024);
+
+    } catch (const std::exception& e) {
+        LOG_ERROR(Render_Vulkan, "Exception while loading pipeline cache: {}", e.what());
+        auto [result, cache] = instance.GetDevice().createPipelineCacheUnique({});
+        pipeline_cache = std::move(cache);
+    }
+}
+
+void PipelineCache::SaveVulkanPipelineCache() {
+    using namespace Common::FS;
+
+    if (!pipeline_cache) {
+        return;
+    }
+
+    try {
+        // Get cache data from Vulkan
+        auto cache_data = instance.GetDevice().getPipelineCacheData(*pipeline_cache);
+
+        if (cache_data.empty()) {
+            LOG_WARNING(Render_Vulkan, "Pipeline cache is empty, skipping save");
+            return;
+        }
+
+        const auto cache_dir = GetUserPath(PathType::ShaderDir) / "cache";
+        if (!std::filesystem::exists(cache_dir)) {
+            std::filesystem::create_directories(cache_dir);
+        }
+
+        const auto pipeline_cache_path = cache_dir / "pipeline_cache.bin";
+        IOFile file(pipeline_cache_path, FileAccessMode::Create);
+
+        if (!file.IsOpen()) {
+            LOG_WARNING(Render_Vulkan, "Failed to create pipeline cache file");
+            return;
+        }
+
+        const size_t bytes_written = file.WriteRaw<u8>(cache_data.data(), cache_data.size());
+        if (bytes_written != cache_data.size()) {
+            LOG_WARNING(Render_Vulkan, "Failed to write complete pipeline cache data");
+            return;
+        }
+
+        file.Flush();
+        LOG_INFO(Render_Vulkan, "Saved Vulkan pipeline cache ({} KB)", cache_data.size() / 1024);
+
+    } catch (const std::exception& e) {
+        LOG_ERROR(Render_Vulkan, "Exception while saving pipeline cache: {}", e.what());
+    }
 }
 
 } // namespace Vulkan
