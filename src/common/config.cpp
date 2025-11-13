@@ -181,6 +181,7 @@ static ConfigEntry<bool> isHDRAllowed(false);
 static ConfigEntry<bool> fsrEnabled(true);
 static ConfigEntry<bool> rcasEnabled(true);
 static ConfigEntry<int> rcasAttenuation(250);
+static ConfigEntry<string> screenStretchMode("Fit"); // Fit, Stretch, 16:10, 4:3, 21:9
 
 // Vulkan
 static ConfigEntry<s32> gpuId(-1);
@@ -829,6 +830,14 @@ void setRcasAttenuation(int value, bool is_game_specific) {
     rcasAttenuation.set(value, is_game_specific);
 }
 
+std::string getScreenStretchMode() {
+    return screenStretchMode.get();
+}
+
+void setScreenStretchMode(const std::string& mode, bool is_game_specific) {
+    screenStretchMode.set(mode, is_game_specific);
+}
+
 int getUsbDeviceBackend() {
     return usbDeviceBackend.get();
 }
@@ -934,6 +943,7 @@ void load(const std::filesystem::path& path, bool is_game_specific) {
         fsrEnabled.setFromToml(gpu, "fsrEnabled", is_game_specific);
         rcasEnabled.setFromToml(gpu, "rcasEnabled", is_game_specific);
         rcasAttenuation.setFromToml(gpu, "rcasAttenuation", is_game_specific);
+        screenStretchMode.setFromToml(gpu, "screenStretchMode", is_game_specific);
     }
 
     if (data.contains("Vulkan")) {
@@ -1105,6 +1115,7 @@ void save(const std::filesystem::path& path, bool is_game_specific) {
     fsrEnabled.setTomlValue(data, "GPU", "fsrEnabled", is_game_specific);
     rcasEnabled.setTomlValue(data, "GPU", "rcasEnabled", is_game_specific);
     rcasAttenuation.setTomlValue(data, "GPU", "rcasAttenuation", is_game_specific);
+    screenStretchMode.setTomlValue(data, "GPU", "screenStretchMode", is_game_specific);
     directMemoryAccessEnabled.setTomlValue(data, "GPU", "directMemoryAccess", is_game_specific);
 
     gpuId.setTomlValue(data, "Vulkan", "gpuId", is_game_specific);
