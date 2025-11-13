@@ -4,6 +4,7 @@
 #include "layer.h"
 
 #include <SDL3/SDL_events.h>
+#include <SDL3/SDL_video.h>
 #include <imgui.h>
 
 #include "SDL3/SDL_log.h"
@@ -14,6 +15,7 @@
 #include "imgui/imgui_std.h"
 #include "imgui_internal.h"
 #include "options.h"
+#include "sdl_window.h"
 #include "video_core/renderer_vulkan/vk_presenter.h"
 #include "widget/frame_dump.h"
 #include "widget/frame_graph.h"
@@ -22,6 +24,7 @@
 #include "widget/shader_list.h"
 
 extern std::unique_ptr<Vulkan::Presenter> presenter;
+extern Frontend::WindowSDL* g_window;
 
 using namespace ImGui;
 using namespace ::Core::Devtools;
@@ -30,6 +33,7 @@ using L = ::Core::Devtools::Layer;
 static bool show_simple_fps = false;
 static bool visibility_toggled = false;
 static bool show_quit_window = false;
+static int quit_menu_selection = 0; // 0 = Exit Game, 1 = Return to Desktop, 2 = Cancel
 
 static float fps_scale = 1.0f;
 static int dump_frame_count = 1;
@@ -431,26 +435,74 @@ void L::Draw() {
         ImVec2 center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
-        if (Begin("Quit Notification", nullptr,
+        // Add a dimmed background overlay
+        ImDrawList* draw_list = GetForegroundDrawList();
+        ImVec2 viewport_size = GetMainViewport()->Size;
+        draw_list->AddRectFilled(ImVec2(0, 0), viewport_size, IM_COL32(0, 0, 0, 180));
+
+        if (Begin("Controller Exit Menu", nullptr,
                   ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoDecoration |
                       ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking)) {
             SetWindowFontScale(1.5f);
-            TextCentered("Are you sure you want to quit?");
-            NewLine();
-            Text("Press Escape or Circle/B button to cancel");
-            Text("Press Enter or Cross/A button to quit");
 
-            if (IsKeyPressed(ImGuiKey_Escape, false) ||
-                (IsKeyPressed(ImGuiKey_GamepadFaceRight, false))) {
-                show_quit_window = false;
+            // Navigation with D-pad or analog stick
+            if (IsKeyPressed(ImGuiKey_DownArrow, true) ||
+                IsKeyPressed(ImGuiKey_GamepadDpadDown, true) ||
+                IsKeyPressed(ImGuiKey_GamepadLStickDown, true)) {
+                quit_menu_selection = (quit_menu_selection + 1) % 3;
+            }
+            if (IsKeyPressed(ImGuiKey_UpArrow, true) ||
+                IsKeyPressed(ImGuiKey_GamepadDpadUp, true) ||
+                IsKeyPressed(ImGuiKey_GamepadLStickUp, true)) {
+                quit_menu_selection = (quit_menu_selection + 2) % 3;
             }
 
+            // Display menu options with selection indicator
+            const char* options[] = {"Exit Game", "Return to Desktop", "Cancel"};
+            TextCentered("Select an option:");
+            NewLine();
+
+            for (int i = 0; i < 3; i++) {
+                if (i == quit_menu_selection) {
+                    PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.0f, 1.0f)); // Yellow
+                    TextCentered(std::string("> ") + options[i] + " <");
+                    PopStyleColor();
+                } else {
+                    TextCentered(options[i]);
+                }
+            }
+
+            NewLine();
+            SetWindowFontScale(1.0f);
+            TextCentered("Use D-pad/Stick to navigate");
+            TextCentered("Press Cross/A to select, Circle/B to cancel");
+
+            // Handle selection with Cross/A button or Enter
             if (IsKeyPressed(ImGuiKey_Enter, false) ||
-                (IsKeyPressed(ImGuiKey_GamepadFaceDown, false))) {
-                SDL_Event event;
-                SDL_memset(&event, 0, sizeof(event));
-                event.type = SDL_EVENT_QUIT;
-                SDL_PushEvent(&event);
+                IsKeyPressed(ImGuiKey_GamepadFaceDown, false)) {
+
+                if (quit_menu_selection == 0) {
+                    // Exit Game - quit the application
+                    SDL_Event event;
+                    SDL_memset(&event, 0, sizeof(event));
+                    event.type = SDL_EVENT_QUIT;
+                    SDL_PushEvent(&event);
+                } else if (quit_menu_selection == 1) {
+                    // Return to Desktop - minimize window
+                    if (g_window && g_window->GetSDLWindow()) {
+                        SDL_MinimizeWindow(g_window->GetSDLWindow());
+                    }
+                    show_quit_window = false;
+                } else {
+                    // Cancel - just close the menu
+                    show_quit_window = false;
+                }
+            }
+
+            // Handle cancel with Circle/B button or Escape
+            if (IsKeyPressed(ImGuiKey_Escape, false) ||
+                IsKeyPressed(ImGuiKey_GamepadFaceRight, false)) {
+                show_quit_window = false;
             }
         }
         End();
@@ -477,6 +529,9 @@ void ToggleSimpleFps() {
 
 void ToggleQuitWindow() {
     show_quit_window = !show_quit_window;
+    if (show_quit_window) {
+        quit_menu_selection = 0; // Reset to first option when opening
+    }
 }
 
 } // namespace Overlay
