@@ -407,6 +407,24 @@ void FsrPass::ResizeAndInvalidate(u32 width, u32 height) {
 void FsrPass::CreateImages(Img& img) const {
     img.dirty = false;
 
+    // Destroy existing images and views if they exist (needed when recreating due to resize)
+    img.intermediary_image_view.reset();
+    img.output_image_view.reset();
+
+    if (img.intermediary_image) {
+        vmaDestroyImage(img.intermediary_image.allocator, img.intermediary_image.image,
+                        img.intermediary_image.allocation);
+        img.intermediary_image.image = VK_NULL_HANDLE;
+        img.intermediary_image.allocation = VK_NULL_HANDLE;
+    }
+
+    if (img.output_image) {
+        vmaDestroyImage(img.output_image.allocator, img.output_image.image,
+                        img.output_image.allocation);
+        img.output_image.image = VK_NULL_HANDLE;
+        img.output_image.allocation = VK_NULL_HANDLE;
+    }
+
     vk::ImageCreateInfo image_create_info{
         .imageType = vk::ImageType::e2D,
         .format = vk::Format::eR16G16B16A16Sfloat,
