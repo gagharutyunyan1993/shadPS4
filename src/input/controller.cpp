@@ -114,6 +114,55 @@ State GameController::GetLastState() const {
 }
 
 void GameController::AddState(const State& state) {
+    // Check if this is a meaningful change or just motion sensor noise
+    // Motion sensors update at 100+ Hz and can flood the buffer
+    bool has_input_change = false;
+
+    if (m_states_num > 0) {
+        const State& last = GetLastState();
+        const u32 last_index = (m_first_state + m_states_num - 1) % MAX_STATES;
+
+        // Check if buttons changed
+        if (last.buttonsState != state.buttonsState) {
+            has_input_change = true;
+        }
+
+        // Check if any axis changed significantly (threshold of 2 to ignore minor noise)
+        if (!has_input_change) {
+            for (int i = 0; i < static_cast<int>(Axis::AxisMax); i++) {
+                if (std::abs(last.axes[i] - state.axes[i]) > 2) {
+                    has_input_change = true;
+                    break;
+                }
+            }
+        }
+
+        // Check if touchpad changed
+        if (!has_input_change) {
+            for (int i = 0; i < 2; i++) {
+                if (last.touchpad[i].state != state.touchpad[i].state ||
+                    last.touchpad[i].x != state.touchpad[i].x ||
+                    last.touchpad[i].y != state.touchpad[i].y) {
+                    has_input_change = true;
+                    break;
+                }
+            }
+        }
+
+        // If only motion sensors changed, update the last state in-place
+        // This prevents sensor noise from flooding the buffer
+        if (!has_input_change && !m_private[last_index].obtained) {
+            // Update the existing state with new timestamp and sensor data
+            m_states[last_index].time = state.time;
+            m_states[last_index].acceleration = state.acceleration;
+            m_states[last_index].angularVelocity = state.angularVelocity;
+            m_states[last_index].orientation = state.orientation;
+            m_last_state = m_states[last_index];
+            return;
+        }
+    }
+
+    // Add new state for meaningful input changes
     if (m_states_num >= MAX_STATES) {
         m_states_num = MAX_STATES - 1;
         m_first_state = (m_first_state + 1) % MAX_STATES;
