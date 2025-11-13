@@ -221,7 +221,22 @@ void GameController::CalculateOrientation(Libraries::Pad::OrbisFVector3& acceler
                                           float deltaTime,
                                           Libraries::Pad::OrbisFQuaternion& lastOrientation,
                                           Libraries::Pad::OrbisFQuaternion& orientation) {
+    // Limit deltaTime to prevent numerical instability
+    // Maximum 100ms to handle frame drops gracefully
+    constexpr float MAX_DELTA_TIME = 0.1f;
+    if (deltaTime > MAX_DELTA_TIME) {
+        deltaTime = MAX_DELTA_TIME;
+    }
+
+    // Skip update if deltaTime is too small or invalid
+    if (deltaTime <= 0.0f || deltaTime < 0.0001f) {
+        orientation = lastOrientation;
+        return;
+    }
+
     Libraries::Pad::OrbisFQuaternion q = lastOrientation;
+
+    // Gyroscope integration using quaternion derivative
     Libraries::Pad::OrbisFQuaternion ω = {angularVelocity.x, angularVelocity.y, angularVelocity.z,
                                           0.0f};
 
@@ -237,11 +252,72 @@ void GameController::CalculateOrientation(Libraries::Pad::OrbisFVector3& acceler
     q.z += qDot.z * deltaTime;
     q.w += qDot.w * deltaTime;
 
+    // Normalize quaternion
     float norm = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
-    q.x /= norm;
-    q.y /= norm;
-    q.z /= norm;
-    q.w /= norm;
+    if (norm > 0.0001f) {
+        q.x /= norm;
+        q.y /= norm;
+        q.z /= norm;
+        q.w /= norm;
+    } else {
+        // Reset to identity if quaternion became degenerate
+        q = {0.0f, 0.0f, 0.0f, 1.0f};
+    }
+
+    // Apply complementary filter using accelerometer to correct drift
+    // Weight factor: 0.02 means 98% gyro, 2% accel correction
+    constexpr float ACCEL_CORRECTION_WEIGHT = 0.02f;
+
+    // Calculate gravity direction from accelerometer
+    float accelNorm = std::sqrt(acceleration.x * acceleration.x +
+                                acceleration.y * acceleration.y +
+                                acceleration.z * acceleration.z);
+
+    // Only apply correction if accelerometer reading is reasonable (close to 1g)
+    // This filters out cases where the controller is being moved rapidly
+    if (accelNorm > 0.5f && accelNorm < 1.5f) {
+        // Normalize acceleration vector
+        float accelX = acceleration.x / accelNorm;
+        float accelY = acceleration.y / accelNorm;
+        float accelZ = acceleration.z / accelNorm;
+
+        // Expected gravity direction in world frame (down is negative Y in PS4 convention)
+        constexpr float gravityX = 0.0f;
+        constexpr float gravityY = -1.0f;
+        constexpr float gravityZ = 0.0f;
+
+        // Transform expected gravity by current orientation to get predicted accelerometer reading
+        // Inverse rotate gravity vector by quaternion q
+        float predX = (1 - 2*q.y*q.y - 2*q.z*q.z) * gravityX +
+                      (2*q.x*q.y + 2*q.w*q.z) * gravityY +
+                      (2*q.x*q.z - 2*q.w*q.y) * gravityZ;
+        float predY = (2*q.x*q.y - 2*q.w*q.z) * gravityX +
+                      (1 - 2*q.x*q.x - 2*q.z*q.z) * gravityY +
+                      (2*q.y*q.z + 2*q.w*q.x) * gravityZ;
+        float predZ = (2*q.x*q.z + 2*q.w*q.y) * gravityX +
+                      (2*q.y*q.z - 2*q.w*q.x) * gravityY +
+                      (1 - 2*q.x*q.x - 2*q.y*q.y) * gravityZ;
+
+        // Calculate error between predicted and measured acceleration
+        float errorX = accelY * predZ - accelZ * predY;
+        float errorY = accelZ * predX - accelX * predZ;
+        float errorZ = accelX * predY - accelY * predX;
+
+        // Apply correction to quaternion
+        float correctionScale = ACCEL_CORRECTION_WEIGHT * deltaTime;
+        q.x += correctionScale * errorX;
+        q.y += correctionScale * errorY;
+        q.z += correctionScale * errorZ;
+
+        // Re-normalize after correction
+        norm = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+        if (norm > 0.0001f) {
+            q.x /= norm;
+            q.y /= norm;
+            q.z /= norm;
+            q.w /= norm;
+        }
+    }
 
     orientation.x = q.x;
     orientation.y = q.y;
