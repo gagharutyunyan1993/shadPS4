@@ -313,7 +313,12 @@ const ComputePipeline* PipelineCache::GetComputePipeline() {
     const auto [it, is_new] = compute_pipelines.try_emplace(compute_key);
     if (is_new) {
         const auto pipeline_hash = std::hash<ComputePipelineKey>{}(compute_key);
-        LOG_INFO(Render_Vulkan, "Compiling compute pipeline {:#x}", pipeline_hash);
+        const auto& cs_info = runtime_info.cs_info;
+        LOG_INFO(Render_Vulkan,
+                 "Compiling compute pipeline {:#x} | shader_hash={:#x} | "
+                 "workgroup_size={}x{}x{} | shared_memory_size={}",
+                 pipeline_hash, infos[0]->pgm_hash, cs_info.workgroup_size[0],
+                 cs_info.workgroup_size[1], cs_info.workgroup_size[2], cs_info.shared_memory_size);
 
         it.value() =
             std::make_unique<ComputePipeline>(instance, scheduler, desc_heap, profile,

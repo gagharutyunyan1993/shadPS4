@@ -326,6 +326,11 @@ void Rasterizer::DispatchDirect() {
 
     const auto cmdbuf = scheduler.CommandBuffer();
     cmdbuf.bindPipeline(vk::PipelineBindPoint::eCompute, pipeline->Handle());
+
+    // Enhanced logging for compute shader dispatch to help diagnose device lost issues
+    LOG_TRACE(Render_Vulkan, "Dispatching compute shader: workgroup={}x{}x{}",
+              cs_program.dim_x, cs_program.dim_y, cs_program.dim_z);
+
     cmdbuf.dispatch(cs_program.dim_x, cs_program.dim_y, cs_program.dim_z);
 
     ResetBindings();
