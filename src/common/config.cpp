@@ -201,6 +201,11 @@ static ConfigEntry<bool> isSeparateLogFilesEnabled(false);
 static ConfigEntry<bool> isFpsColor(true);
 static ConfigEntry<bool> logEnabled(true);
 
+// Log Submission
+static ConfigEntry<bool> enableAutoLogSubmission(false);
+static ConfigEntry<bool> autoSubmitOnCrash(false);
+static ConfigEntry<string> logSubmissionEndpoint("");
+
 // GUI
 static std::vector<GameInstallDir> settings_install_dirs = {};
 std::vector<bool> install_dirs_enabled = {};
@@ -853,6 +858,30 @@ void setLoadAutoPatches(bool enable) {
     load_auto_patches = enable;
 }
 
+bool getEnableAutoLogSubmission() {
+    return enableAutoLogSubmission.get();
+}
+
+void setEnableAutoLogSubmission(bool enable, bool is_game_specific) {
+    enableAutoLogSubmission.set(enable, is_game_specific);
+}
+
+bool getAutoSubmitOnCrash() {
+    return autoSubmitOnCrash.get();
+}
+
+void setAutoSubmitOnCrash(bool enable, bool is_game_specific) {
+    autoSubmitOnCrash.set(enable, is_game_specific);
+}
+
+std::string getLogSubmissionEndpoint() {
+    return logSubmissionEndpoint.get();
+}
+
+void setLogSubmissionEndpoint(const std::string& endpoint, bool is_game_specific) {
+    logSubmissionEndpoint.set(endpoint, is_game_specific);
+}
+
 void load(const std::filesystem::path& path, bool is_game_specific) {
     // If the configuration file does not exist, create it and return, unless it is game specific
     std::error_code error;
@@ -969,6 +998,9 @@ void load(const std::filesystem::path& path, bool is_game_specific) {
         isShaderDebug.setFromToml(debug, "CollectShader", is_game_specific);
         isFpsColor.setFromToml(debug, "FPSColor", is_game_specific);
         logEnabled.setFromToml(debug, "logEnabled", is_game_specific);
+        enableAutoLogSubmission.setFromToml(debug, "enableAutoLogSubmission", is_game_specific);
+        autoSubmitOnCrash.setFromToml(debug, "autoSubmitOnCrash", is_game_specific);
+        logSubmissionEndpoint.setFromToml(debug, "logSubmissionEndpoint", is_game_specific);
         current_version = toml::find_or<std::string>(debug, "ConfigVersion", current_version);
     }
 
@@ -1133,6 +1165,9 @@ void save(const std::filesystem::path& path, bool is_game_specific) {
     isSeparateLogFilesEnabled.setTomlValue(data, "Debug", "isSeparateLogFilesEnabled",
                                            is_game_specific);
     logEnabled.setTomlValue(data, "Debug", "logEnabled", is_game_specific);
+    enableAutoLogSubmission.setTomlValue(data, "Debug", "enableAutoLogSubmission", is_game_specific);
+    autoSubmitOnCrash.setTomlValue(data, "Debug", "autoSubmitOnCrash", is_game_specific);
+    logSubmissionEndpoint.setTomlValue(data, "Debug", "logSubmissionEndpoint", is_game_specific);
 
     m_language.setTomlValue(data, "Settings", "consoleLanguage", is_game_specific);
 
@@ -1263,6 +1298,9 @@ void setDefaultValues(bool is_game_specific) {
     isShaderDebug.set(false, is_game_specific);
     isSeparateLogFilesEnabled.set(false, is_game_specific);
     logEnabled.set(true, is_game_specific);
+    enableAutoLogSubmission.set(false, is_game_specific);
+    autoSubmitOnCrash.set(false, is_game_specific);
+    logSubmissionEndpoint.set("", is_game_specific);
 
     // GS - Settings
     m_language.set(1, is_game_specific);

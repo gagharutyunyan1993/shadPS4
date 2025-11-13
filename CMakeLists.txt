@@ -665,6 +665,8 @@ set(COMMON src/common/logging/backend.cpp
            src/common/logging/text_formatter.cpp
            src/common/logging/text_formatter.h
            src/common/logging/types.h
+           src/common/log_submission.cpp
+           src/common/log_submission.h
            src/common/aes.h
            src/common/alignment.h
            src/common/arch.h
