@@ -155,6 +155,14 @@ void setSysModulesPath(const std::filesystem::path& path);
 bool getLoadAutoPatches();
 void setLoadAutoPatches(bool enable);
 
+// Log Submission
+bool getEnableAutoLogSubmission();
+void setEnableAutoLogSubmission(bool enable, bool is_game_specific = false);
+bool getAutoSubmitOnCrash();
+void setAutoSubmitOnCrash(bool enable, bool is_game_specific = false);
+std::string getLogSubmissionEndpoint();
+void setLogSubmissionEndpoint(const std::string& endpoint, bool is_game_specific = false);
+
 enum UsbBackendType : int { Real, SkylandersPortal, InfinityBase, DimensionsToypad };
 int getUsbDeviceBackend();
 void setUsbDeviceBackend(int value, bool is_game_specific = false);

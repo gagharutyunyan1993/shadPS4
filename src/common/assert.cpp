@@ -3,6 +3,7 @@
 
 #include "common/arch.h"
 #include "common/assert.h"
+#include "common/log_submission.h"
 #include "common/logging/backend.h"
 
 #if defined(ARCH_X86_64)
@@ -20,6 +21,11 @@ void assert_fail_impl() {
 }
 
 [[noreturn]] void unreachable_impl() {
+    LOG_CRITICAL(Debug, "Unreachable code executed");
+
+    // Attempt automatic log submission if enabled
+    LogSubmission::OnCrashSubmission("", "Unreachable code executed");
+
     Common::Log::Stop();
     std::fflush(stdout);
     Crash();
@@ -28,5 +34,9 @@ void assert_fail_impl() {
 
 void assert_fail_debug_msg(const char* msg) {
     LOG_CRITICAL(Debug, "Assertion Failed!\n{}", msg);
+
+    // Attempt automatic log submission if enabled
+    LogSubmission::OnCrashSubmission("", std::string("Assertion Failed: ") + msg);
+
     assert_fail_impl();
 }

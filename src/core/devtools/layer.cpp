@@ -9,6 +9,7 @@
 
 #include "SDL3/SDL_log.h"
 #include "common/config.h"
+#include "common/log_submission.h"
 #include "common/singleton.h"
 #include "common/types.h"
 #include "core/debug_state.h"
@@ -48,6 +49,10 @@ static bool just_opened_options = false;
 static Widget::MemoryMapViewer memory_map;
 static Widget::ShaderList shader_list;
 static Widget::ModuleList module_list;
+
+static bool show_log_submission_window = false;
+static bool log_submission_in_progress = false;
+static std::string log_submission_status = "";
 
 // clang-format off
 static std::string help_text =
@@ -128,6 +133,10 @@ void L::DrawMenuBar() {
             }
             if (MenuItem("Module list")) {
                 module_list.open = true;
+            }
+            Separator();
+            if (MenuItem("Log Submission Settings")) {
+                show_log_submission_window = true;
             }
             ImGui::EndMenu();
         }
@@ -272,6 +281,91 @@ void L::DrawAdvanced() {
     }
     if (module_list.open) {
         module_list.Draw();
+    }
+
+    // Log Submission Window
+    if (show_log_submission_window) {
+        if (Begin("Log Submission Settings", &show_log_submission_window,
+                  ImGuiWindowFlags_AlwaysAutoResize)) {
+
+            Text("Automatic Log Submission Feature");
+            Separator();
+
+            bool enable_log_submission = Config::getEnableAutoLogSubmission();
+            if (Checkbox("Enable Log Submission", &enable_log_submission)) {
+                Config::setEnableAutoLogSubmission(enable_log_submission);
+            }
+            if (IsItemHovered()) {
+                SetTooltip("Enable automatic collection and submission of logs\n"
+                          "to help developers identify and fix issues faster");
+            }
+
+            BeginDisabled(!enable_log_submission);
+
+            bool auto_submit_crash = Config::getAutoSubmitOnCrash();
+            if (Checkbox("Auto-Submit on Crash", &auto_submit_crash)) {
+                Config::setAutoSubmitOnCrash(auto_submit_crash);
+            }
+            if (IsItemHovered()) {
+                SetTooltip("Automatically submit logs when a crash occurs");
+            }
+
+            Text("Submission Endpoint:");
+            static char endpoint_buffer[512];
+            static bool endpoint_initialized = false;
+            if (!endpoint_initialized) {
+                auto endpoint = Config::getLogSubmissionEndpoint();
+                strncpy(endpoint_buffer, endpoint.c_str(), sizeof(endpoint_buffer) - 1);
+                endpoint_buffer[sizeof(endpoint_buffer) - 1] = '\0';
+                endpoint_initialized = true;
+            }
+
+            if (InputText("##endpoint", endpoint_buffer, sizeof(endpoint_buffer))) {
+                Config::setLogSubmissionEndpoint(std::string(endpoint_buffer));
+            }
+            if (IsItemHovered()) {
+                SetTooltip("The server URL where logs will be submitted\n"
+                          "Leave empty if no server is configured");
+            }
+
+            Separator();
+            Text("Privacy Notice:");
+            PushTextWrapPos(GetWindowWidth() - 20.0f);
+            TextWrapped("Submitted data includes: system specifications, "
+                       "emulator version, log files, and game ID. "
+                       "No personal information is collected.");
+            PopTextWrapPos();
+
+            Separator();
+
+            BeginDisabled(log_submission_in_progress);
+            if (Button("Submit Logs Manually", ImVec2(-1, 0))) {
+                log_submission_in_progress = true;
+                log_submission_status = "Submitting logs...";
+                // Trigger manual submission
+                bool success = LogSubmission::TriggerManualSubmission("");
+                log_submission_status = success ? "Logs submitted successfully!"
+                                                : "Log submission failed (see console for details)";
+                log_submission_in_progress = false;
+            }
+            EndDisabled();
+
+            if (!log_submission_status.empty()) {
+                TextColored(log_submission_in_progress ?
+                           ImVec4(1.0f, 1.0f, 0.0f, 1.0f) : ImVec4(0.0f, 1.0f, 0.0f, 1.0f),
+                           "%s", log_submission_status.c_str());
+            }
+
+            EndDisabled();
+
+            Separator();
+
+            if (Button("Save Settings", ImVec2(-1, 0))) {
+                Config::save(Common::FS::GetUserPath(Common::FS::PathType::UserDir) / "config.toml");
+                log_submission_status = "Settings saved!";
+            }
+        }
+        End();
     }
 }
 
