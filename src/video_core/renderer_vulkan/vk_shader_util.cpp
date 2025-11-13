@@ -6,6 +6,7 @@
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
 #include "common/assert.h"
+#include "common/config.h"
 #include "common/logging/log.h"
 #include "video_core/renderer_vulkan/vk_shader_util.h"
 
@@ -241,7 +242,9 @@ vk::ShaderModule Compile(std::string_view code, vk::ShaderStageFlagBits stage, v
 
     // Enable optimizations on the generated SPIR-V code.
     options.disableOptimizer = false;
-    options.validate = false;
+    // Enable SPIR-V validation when Vulkan validation is enabled
+    // This helps catch invalid SPIR-V that might cause device lost errors on strict drivers
+    options.validate = Config::vkValidationEnabled();
     options.optimizeSize = true;
 
     glslang::GlslangToSpv(*intermediate, out_code, &logger, &options);
