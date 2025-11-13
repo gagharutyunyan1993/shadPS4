@@ -106,15 +106,23 @@ void Translator::ExportRenderTarget(const GcnInst& inst) {
     // Swizzle components and export
     for (u32 i = 0; i < 4; ++i) {
         const auto swizzled_comp = components[color_buffer.swizzle.Map(i)];
+        IR::F32 value_to_write;
+
         if (swizzled_comp.IsEmpty()) {
-            continue;
+            // AMD GCN hardware defaults unwritten components to 0.0 for RGB, 1.0 for Alpha.
+            // This is critical for AMD drivers which may not handle undefined values gracefully,
+            // leading to black artifacts or other rendering issues (e.g., Issue #3752).
+            value_to_write = (i == 3) ? ir.Imm32(1.0f) : ir.Imm32(0.0f);
+        } else {
+            auto converted = ApplyWriteNumberConversion(ir, swizzled_comp, color_buffer.num_conversion);
+            if (needs_unorm_fixup) {
+                // FIXME: Fix-up for GPUs where float-to-unorm rounding is off from expected.
+                converted = ir.FPSub(converted, ir.Imm32(1.f / 127500.f));
+            }
+            value_to_write = converted;
         }
-        auto converted = ApplyWriteNumberConversion(ir, swizzled_comp, color_buffer.num_conversion);
-        if (needs_unorm_fixup) {
-            // FIXME: Fix-up for GPUs where float-to-unorm rounding is off from expected.
-            converted = ir.FPSub(converted, ir.Imm32(1.f / 127500.f));
-        }
-        ir.SetAttribute(mrt, converted, i);
+
+        ir.SetAttribute(mrt, value_to_write, i);
     }
 }
 
