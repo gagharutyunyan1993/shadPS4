@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <memory>
 #include <variant>
 #include <tsl/robin_map.h>
 #include "shader_recompiler/profile.h"
@@ -11,6 +12,7 @@
 #include "video_core/renderer_vulkan/vk_compute_pipeline.h"
 #include "video_core/renderer_vulkan/vk_graphics_pipeline.h"
 #include "video_core/renderer_vulkan/vk_resource_pool.h"
+#include "video_core/renderer_vulkan/vk_shader_cache.h"
 
 template <>
 struct std::hash<vk::ShaderModule> {
@@ -90,6 +92,10 @@ private:
                                    Shader::Backend::Bindings& binding);
     const Shader::RuntimeInfo& BuildRuntimeInfo(Shader::Stage stage, Shader::LogicalStage l_stage);
 
+    u64 HashRuntimeInfo(const Shader::RuntimeInfo& runtime_info);
+    void LoadVulkanPipelineCache();
+    void SaveVulkanPipelineCache();
+
 private:
     const Instance& instance;
     Scheduler& scheduler;
@@ -113,6 +119,9 @@ private:
     tsl::robin_map<vk::ShaderModule,
                    std::vector<std::variant<GraphicsPipelineKey, ComputePipelineKey>>>
         module_related_pipelines;
+
+    // Shader cache for persistent SPIR-V storage
+    std::unique_ptr<ShaderCache> shader_cache;
 };
 
 } // namespace Vulkan

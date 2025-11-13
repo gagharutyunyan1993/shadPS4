@@ -172,6 +172,7 @@ static ConfigEntry<bool> readbackLinearImagesEnabled(false);
 static ConfigEntry<bool> directMemoryAccessEnabled(false);
 static ConfigEntry<bool> shouldDumpShaders(false);
 static ConfigEntry<bool> shouldPatchShaders(false);
+static ConfigEntry<bool> shouldCacheShaders(true);
 static ConfigEntry<u32> vblankFrequency(60);
 static ConfigEntry<bool> isFullscreen(false);
 static ConfigEntry<string> fullscreenMode("Windowed");
@@ -448,6 +449,10 @@ bool patchShaders() {
     return shouldPatchShaders.get();
 }
 
+bool shaderCacheEnabled() {
+    return shouldCacheShaders.get();
+}
+
 bool isRdocEnabled() {
     return rdocEnable.get();
 }
@@ -581,6 +586,10 @@ void setDirectMemoryAccess(bool enable, bool is_game_specific) {
 
 void setDumpShaders(bool enable, bool is_game_specific) {
     shouldDumpShaders.set(enable, is_game_specific);
+}
+
+void setShaderCacheEnabled(bool enable, bool is_game_specific) {
+    shouldCacheShaders.set(enable, is_game_specific);
 }
 
 void setVkValidation(bool enable, bool is_game_specific) {
