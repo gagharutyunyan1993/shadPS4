@@ -145,6 +145,8 @@ bool getRcasEnabled();
 void setRcasEnabled(bool enable, bool is_game_specific = false);
 int getRcasAttenuation();
 void setRcasAttenuation(int value, bool is_game_specific = false);
+std::string getScreenStretchMode();
+void setScreenStretchMode(const std::string& mode, bool is_game_specific = false);
 bool getIsConnectedToNetwork();
 void setConnectedToNetwork(bool enable, bool is_game_specific = false);
 void setUserName(const std::string& name, bool is_game_specific = false);

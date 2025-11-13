@@ -76,16 +76,32 @@ bool CanBlitToSwapchain(const vk::PhysicalDevice physical_device, vk::Format for
 
 static vk::Rect2D FitImage(s32 frame_width, s32 frame_height, s32 swapchain_width,
                            s32 swapchain_height) {
-    float frame_aspect = static_cast<float>(frame_width) / frame_height;
+    const std::string stretch_mode = Config::getScreenStretchMode();
+
+    // Determine target aspect ratio based on mode
+    float target_aspect = static_cast<float>(frame_width) / frame_height; // Default: preserve game aspect
+
+    if (stretch_mode == "Stretch") {
+        // Fill entire screen, ignore aspect ratio
+        return vk::Rect2D{{0, 0}, {static_cast<u32>(swapchain_width), static_cast<u32>(swapchain_height)}};
+    } else if (stretch_mode == "16:10") {
+        target_aspect = 16.0f / 10.0f;
+    } else if (stretch_mode == "4:3") {
+        target_aspect = 4.0f / 3.0f;
+    } else if (stretch_mode == "21:9") {
+        target_aspect = 21.0f / 9.0f;
+    }
+    // else use "Fit" mode (default) - preserve original aspect ratio
+
     float swapchain_aspect = static_cast<float>(swapchain_width) / swapchain_height;
 
     u32 dst_width = swapchain_width;
     u32 dst_height = swapchain_height;
 
-    if (frame_aspect > swapchain_aspect) {
-        dst_height = static_cast<s32>(swapchain_width / frame_aspect);
+    if (target_aspect > swapchain_aspect) {
+        dst_height = static_cast<s32>(swapchain_width / target_aspect);
     } else {
-        dst_width = static_cast<s32>(swapchain_height * frame_aspect);
+        dst_width = static_cast<s32>(swapchain_height * target_aspect);
     }
 
     const s32 offset_x = (swapchain_width - dst_width) / 2;
