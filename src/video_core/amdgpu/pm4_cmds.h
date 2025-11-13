@@ -1197,4 +1197,39 @@ struct PM4CmdCondExec {
     }
 };
 
+struct PM4CmdSetPredication {
+    enum class PredOp : u32 {
+        Clear = 0,       ///< Discard results and set PREDICATION_RESULT to 0
+        SetZeroPass = 1, ///< Set PREDICATION_RESULT = (ZpassPixelCount == 0)
+        SetNoZeroPass = 2, ///< Set PREDICATION_RESULT = (ZpassPixelCount != 0)
+    };
+
+    PM4Type3Header header;
+    union {
+        BitField<0, 1, u32> pred_bool; ///< Enable or disable predication
+        BitField<4, 2, PredOp> pred_op; ///< Predication operation
+        BitField<8, 1, u32> continue_bit; ///< Continue from previous predication
+        BitField<12, 1, u32> hint; ///< Hint to CP for optimization
+        u32 dw1;
+    };
+    u32 addr_lo; ///< Low address of predication data
+    u32 addr_hi; ///< High address of predication data
+
+    template <typename T = u64*>
+    T Address() const {
+        return std::bit_cast<T>(u64(addr_lo) | (u64(addr_hi) << 32));
+    }
+};
+
+struct PM4CmdGetLodStats {
+    PM4Type3Header header;
+    u32 addr_lo; ///< Low address where LOD stats will be written
+    u32 addr_hi; ///< High address where LOD stats will be written
+
+    template <typename T = u64*>
+    T Address() const {
+        return std::bit_cast<T>(u64(addr_lo) | (u64(addr_hi) << 32));
+    }
+};
+
 } // namespace AmdGpu
