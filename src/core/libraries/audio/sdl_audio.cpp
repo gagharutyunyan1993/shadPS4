@@ -14,10 +14,31 @@
 #define SDL_INVALID_AUDIODEVICEID 0 // Defined in SDL_audio.h but not made a macro
 namespace Libraries::AudioOut {
 
+// Helper function to get volume multiplier based on port type
+static float GetVolumeMultiplierForPort(OrbisAudioOutPort port_type) {
+    switch (port_type) {
+    case OrbisAudioOutPort::Main:
+    case OrbisAudioOutPort::Audio3d:
+        return Config::getMainVolumeSlider() / 100.0f;
+    case OrbisAudioOutPort::Bgm:
+        return Config::getBgmVolumeSlider() / 100.0f;
+    case OrbisAudioOutPort::Voice:
+        return Config::getVoiceVolumeSlider() / 100.0f;
+    case OrbisAudioOutPort::Personal:
+        return Config::getSfxVolumeSlider() / 100.0f; // Use SFX for personal audio
+    case OrbisAudioOutPort::PadSpk:
+        return Config::getPadSpkVolumeSlider() / 100.0f;
+    case OrbisAudioOutPort::Aux:
+    default:
+        return Config::getMainVolumeSlider() / 100.0f; // Default to main
+    }
+}
+
 class SDLPortBackend : public PortBackend {
 public:
     explicit SDLPortBackend(const PortOut& port)
-        : frame_size(port.format_info.FrameSize()), guest_buffer_size(port.BufferSize()) {
+        : frame_size(port.format_info.FrameSize()), guest_buffer_size(port.BufferSize()),
+          port_type(port.type) {
         const SDL_AudioSpec fmt = {
             .format = port.format_info.is_float ? SDL_AUDIO_F32LE : SDL_AUDIO_S16LE,
             .channels = port.format_info.num_channels,
@@ -78,7 +99,9 @@ public:
             stream = nullptr;
             return;
         }
-        SDL_SetAudioStreamGain(stream, Config::getVolumeSlider() / 100.0f);
+        // Set initial volume with category multiplier
+        float initial_volume = Config::getVolumeSlider() / 100.0f * GetVolumeMultiplierForPort(port_type);
+        SDL_SetAudioStreamGain(stream, initial_volume);
     }
 
     ~SDLPortBackend() override {
@@ -114,8 +137,9 @@ public:
         }
         // SDL does not have per-channel volumes, for now just take the maximum of the channels.
         const auto vol = *std::ranges::max_element(ch_volumes);
+        float category_multiplier = GetVolumeMultiplierForPort(port_type);
         if (!SDL_SetAudioStreamGain(stream, static_cast<float>(vol) / SCE_AUDIO_OUT_VOLUME_0DB *
-                                                Config::getVolumeSlider() / 100.0f)) {
+                                                Config::getVolumeSlider() / 100.0f * category_multiplier)) {
             LOG_WARNING(Lib_AudioOut, "Failed to change SDL audio stream volume: {}",
                         SDL_GetError());
         }
@@ -142,6 +166,7 @@ private:
         }
     }
 
+    OrbisAudioOutPort port_type;
     u32 frame_size;
     u32 guest_buffer_size;
     u32 host_buffer_size{};
