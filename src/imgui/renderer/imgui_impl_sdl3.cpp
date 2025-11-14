@@ -477,6 +477,7 @@ bool ProcessEvent(const SDL_Event* event) {
         bd->mouse_window_id = event->window.windowID;
         bd->mouse_pending_leave_frame = 0;
         bd->lastCursorMoveTime = bd->time;
+        bd->mouse_last_cursor = nullptr; // Force cursor refresh on next frame
         return true;
     }
     // - In some cases, when detaching a window from main viewport SDL may send
@@ -497,6 +498,9 @@ bool ProcessEvent(const SDL_Event* event) {
         if (GetViewportForWindowId(event->window.windowID) == NULL)
             return false;
         io.AddFocusEvent(event->type == SDL_EVENT_WINDOW_FOCUS_GAINED);
+        if (event->type == SDL_EVENT_WINDOW_FOCUS_GAINED) {
+            bd->mouse_last_cursor = nullptr; // Force cursor refresh when window gains focus
+        }
         return true;
     }
     case SDL_EVENT_GAMEPAD_ADDED:
