@@ -115,9 +115,47 @@ Error PS4_SYSV_ABI sceImeDialogGetPanelSize(const OrbisImeDialogParam* param, u3
     return Error::OK;
 }
 
-int PS4_SYSV_ABI sceImeDialogGetPanelSizeExtended() {
-    LOG_ERROR(Lib_ImeDialog, "(STUBBED) called");
-    return ORBIS_OK;
+Error PS4_SYSV_ABI sceImeDialogGetPanelSizeExtended(const OrbisImeDialogParam* param,
+                                                     const OrbisImeParamExtended* extended,
+                                                     u32* width, u32* height) {
+    LOG_INFO(Lib_ImeDialog, "called");
+
+    if (!width || !height) {
+        return Error::INVALID_ADDRESS;
+    }
+
+    if (!param) {
+        return Error::INVALID_ADDRESS;
+    }
+
+    // First get the base panel size
+    Error result = sceImeDialogGetPanelSize(param, width, height);
+    if (result != Error::OK) {
+        return result;
+    }
+
+    // If extended parameters are provided, adjust the size based on extended options
+    if (extended) {
+        // PRIORITY_FULL_WIDTH option may affect the panel width
+        if (True(extended->option & OrbisImeExtOption::PRIORITY_FULL_WIDTH)) {
+            // For full width mode, use maximum width
+            if (True(param->option & OrbisImeOption::USE_OVER_2K_COORDINATES)) {
+                *width = 1200; // Larger width for 4K mode
+            } else {
+                *width = 800; // Standard full width for 1080p mode
+            }
+        }
+
+        // PRIORITY_FIXED_PANEL option ensures fixed panel size
+        if (True(extended->option & OrbisImeExtOption::PRIORITY_FIXED_PANEL)) {
+            // Fixed panel maintains consistent size regardless of type
+            *width = 600;
+            *height = 400;
+        }
+    }
+
+    LOG_DEBUG(Lib_ImeDialog, "Panel size: width={}, height={}", *width, *height);
+    return Error::OK;
 }
 
 Error PS4_SYSV_ABI sceImeDialogGetResult(OrbisImeDialogResult* result) {
