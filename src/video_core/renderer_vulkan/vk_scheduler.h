@@ -41,7 +41,46 @@ struct RenderState {
     }
 
     bool operator==(const RenderState& other) const noexcept {
-        return std::memcmp(this, &other, sizeof(RenderState)) == 0;
+        // Compare attachment info structures field-by-field to avoid padding issues
+        auto compare_attachment = [](const vk::RenderingAttachmentInfo& a,
+                                      const vk::RenderingAttachmentInfo& b) {
+            return a.imageView == b.imageView && a.imageLayout == b.imageLayout &&
+                   a.resolveMode == b.resolveMode && a.resolveImageView == b.resolveImageView &&
+                   a.resolveImageLayout == b.resolveImageLayout && a.loadOp == b.loadOp &&
+                   a.storeOp == b.storeOp &&
+                   // Compare clearValue union - use depthStencil for depth/stencil, color for others
+                   a.clearValue.color.float32[0] == b.clearValue.color.float32[0] &&
+                   a.clearValue.color.float32[1] == b.clearValue.color.float32[1] &&
+                   a.clearValue.color.float32[2] == b.clearValue.color.float32[2] &&
+                   a.clearValue.color.float32[3] == b.clearValue.color.float32[3];
+        };
+
+        // Compare basic state
+        if (num_color_attachments != other.num_color_attachments ||
+            num_layers != other.num_layers || has_depth != other.has_depth ||
+            has_stencil != other.has_stencil || width != other.width ||
+            height != other.height) {
+            return false;
+        }
+
+        // Compare color attachments
+        for (u32 i = 0; i < num_color_attachments; i++) {
+            if (!compare_attachment(color_attachments[i], other.color_attachments[i])) {
+                return false;
+            }
+        }
+
+        // Compare depth attachment if present
+        if (has_depth && !compare_attachment(depth_attachment, other.depth_attachment)) {
+            return false;
+        }
+
+        // Compare stencil attachment if present
+        if (has_stencil && !compare_attachment(stencil_attachment, other.stencil_attachment)) {
+            return false;
+        }
+
+        return true;
     }
 };
 
