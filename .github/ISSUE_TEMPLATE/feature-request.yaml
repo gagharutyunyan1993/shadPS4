@@ -10,6 +10,8 @@ body:
       value: |
         ## Important: Read First
 
+        **This repository is for the shadPS4 core emulator. For feature requests related to the QtLauncher GUI (interface improvements, new UI features, etc.), please submit them at the [QtLauncher repository](https://github.com/shadps4-emu/shadps4-qtlauncher/issues) instead.**
+
         Please make an effort to make sure your issue isn't already reported.
 
         Do not create issues involving software piracy, our rules specifically prohibit this. Otherwise your issue will be closed and you will be banned in this repository.

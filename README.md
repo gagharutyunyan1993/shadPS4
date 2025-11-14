@@ -37,7 +37,13 @@ SPDX-License-Identifier: GPL-2.0-or-later
 **shadPS4** is an early **PlayStation 4** emulator for **Windows**, **Linux** and **macOS** written in C++.
 
 > [!IMPORTANT]
-> This is the emulator core, which does not include a GUI. If you just want to use the emulator as an end user, download the [**QtLauncher**](https://github.com/shadps4-emu/shadps4-qtlauncher/releases) instead.
+> **This repository contains only the emulator core.** The project is separated into two components:
+> - **shadPS4 Core** (this repository): The core emulation engine without a graphical interface
+> - **[QtLauncher](https://github.com/shadps4-emu/shadps4-qtlauncher)**: The graphical user interface (GUI)
+>
+> If you just want to use the emulator as an end user, download the [**QtLauncher**](https://github.com/shadps4-emu/shadps4-qtlauncher/releases) instead.
+>
+> **For GUI-related issues or feature requests**, please report them at the [**QtLauncher repository**](https://github.com/shadps4-emu/shadps4-qtlauncher/issues).
 
 If you encounter problems or have doubts, do not hesitate to look at the [**Quickstart**](https://github.com/shadps4-emu/shadPS4/wiki/I.-Quick-start-%5BUsers%5D).\
 To verify that a game works, you can look at [**shadPS4 Game Compatibility**](https://github.com/shadps4-compatibility/shadps4-game-compatibility).\
