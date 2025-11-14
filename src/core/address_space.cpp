@@ -119,8 +119,10 @@ struct AddressSpace::Impl {
         RtlGetVersion(&os_version_info);
 
         u64 supported_user_max = USER_MAX;
-        // This is the build number for Windows 11 22H2
-        static constexpr s32 AffectedBuildNumber = 22621;
+        // Windows builds have performance/stability issues with VirtualAlloc2 at high addresses.
+        // Apply the workaround for all current Windows versions to avoid visual artifacts and crashes.
+        // Build number 30000 should cover all Windows 11 versions and future releases.
+        static constexpr s32 AffectedBuildNumber = 30000;
 
         // Higher PS4 firmware versions prevent higher address mappings too.
         s32 sdk_ver = Common::ElfInfo::Instance().CompiledSdkVer();
@@ -132,7 +134,7 @@ struct AddressSpace::Impl {
             if (sdk_ver < Common::ElfInfo::FW_30) {
                 LOG_WARNING(
                     Core,
-                    "Older Windows version detected, reducing user max to {:#x} to avoid problems",
+                    "Windows detected, reducing user max to {:#x} to avoid VirtualAlloc2 issues",
                     supported_user_max);
             }
         }
