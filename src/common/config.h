@@ -31,6 +31,21 @@ bool getGameRunning();
 void setGameRunning(bool running);
 int getVolumeSlider();
 void setVolumeSlider(int volumeValue, bool is_game_specific = false);
+
+// Category-specific volume controls
+int getMainVolumeSlider();
+void setMainVolumeSlider(int volumeValue, bool is_game_specific = false);
+int getBgmVolumeSlider();
+void setBgmVolumeSlider(int volumeValue, bool is_game_specific = false);
+int getVoiceVolumeSlider();
+void setVoiceVolumeSlider(int volumeValue, bool is_game_specific = false);
+int getSfxVolumeSlider();
+void setSfxVolumeSlider(int volumeValue, bool is_game_specific = false);
+int getPadSpkVolumeSlider();
+void setPadSpkVolumeSlider(int volumeValue, bool is_game_specific = false);
+int getTrophyVolumeSlider();
+void setTrophyVolumeSlider(int volumeValue, bool is_game_specific = false);
+
 std::string getTrophyKey();
 void setTrophyKey(std::string key);
 bool getIsFullscreen();

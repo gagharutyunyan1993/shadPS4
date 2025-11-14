@@ -130,6 +130,15 @@ public:
 
 // General
 static ConfigEntry<int> volumeSlider(100);
+
+// Audio - Category-specific volumes
+static ConfigEntry<int> mainVolumeSlider(100);
+static ConfigEntry<int> bgmVolumeSlider(100);
+static ConfigEntry<int> voiceVolumeSlider(100);
+static ConfigEntry<int> sfxVolumeSlider(100);
+static ConfigEntry<int> padSpkVolumeSlider(100);
+static ConfigEntry<int> trophyVolumeSlider(100);
+
 static ConfigEntry<bool> isNeo(false);
 static ConfigEntry<bool> isDevKit(false);
 static ConfigEntry<int> extraDmemInMbytes(0);
@@ -303,6 +312,55 @@ std::filesystem::path GetSaveDataPath() {
 
 void setVolumeSlider(int volumeValue, bool is_game_specific) {
     volumeSlider.set(volumeValue, is_game_specific);
+}
+
+// Category-specific volume getters/setters
+int getMainVolumeSlider() {
+    return mainVolumeSlider.get();
+}
+
+void setMainVolumeSlider(int volumeValue, bool is_game_specific) {
+    mainVolumeSlider.set(volumeValue, is_game_specific);
+}
+
+int getBgmVolumeSlider() {
+    return bgmVolumeSlider.get();
+}
+
+void setBgmVolumeSlider(int volumeValue, bool is_game_specific) {
+    bgmVolumeSlider.set(volumeValue, is_game_specific);
+}
+
+int getVoiceVolumeSlider() {
+    return voiceVolumeSlider.get();
+}
+
+void setVoiceVolumeSlider(int volumeValue, bool is_game_specific) {
+    voiceVolumeSlider.set(volumeValue, is_game_specific);
+}
+
+int getSfxVolumeSlider() {
+    return sfxVolumeSlider.get();
+}
+
+void setSfxVolumeSlider(int volumeValue, bool is_game_specific) {
+    sfxVolumeSlider.set(volumeValue, is_game_specific);
+}
+
+int getPadSpkVolumeSlider() {
+    return padSpkVolumeSlider.get();
+}
+
+void setPadSpkVolumeSlider(int volumeValue, bool is_game_specific) {
+    padSpkVolumeSlider.set(volumeValue, is_game_specific);
+}
+
+int getTrophyVolumeSlider() {
+    return trophyVolumeSlider.get();
+}
+
+void setTrophyVolumeSlider(int volumeValue, bool is_game_specific) {
+    trophyVolumeSlider.set(volumeValue, is_game_specific);
 }
 
 bool isNeoModeConsole() {
@@ -948,6 +1006,14 @@ void load(const std::filesystem::path& path, bool is_game_specific) {
         micDevice.setFromToml(audio, "micDevice", is_game_specific);
         mainOutputDevice.setFromToml(audio, "mainOutputDevice", is_game_specific);
         padSpkOutputDevice.setFromToml(audio, "padSpkOutputDevice", is_game_specific);
+
+        // Category-specific volumes
+        mainVolumeSlider.setFromToml(audio, "mainVolumeSlider", is_game_specific);
+        bgmVolumeSlider.setFromToml(audio, "bgmVolumeSlider", is_game_specific);
+        voiceVolumeSlider.setFromToml(audio, "voiceVolumeSlider", is_game_specific);
+        sfxVolumeSlider.setFromToml(audio, "sfxVolumeSlider", is_game_specific);
+        padSpkVolumeSlider.setFromToml(audio, "padSpkVolumeSlider", is_game_specific);
+        trophyVolumeSlider.setFromToml(audio, "trophyVolumeSlider", is_game_specific);
     }
 
     if (data.contains("GPU")) {
@@ -1131,6 +1197,14 @@ void save(const std::filesystem::path& path, bool is_game_specific) {
     micDevice.setTomlValue(data, "Audio", "micDevice", is_game_specific);
     mainOutputDevice.setTomlValue(data, "Audio", "mainOutputDevice", is_game_specific);
     padSpkOutputDevice.setTomlValue(data, "Audio", "padSpkOutputDevice", is_game_specific);
+
+    // Category-specific volumes
+    mainVolumeSlider.setTomlValue(data, "Audio", "mainVolumeSlider", is_game_specific);
+    bgmVolumeSlider.setTomlValue(data, "Audio", "bgmVolumeSlider", is_game_specific);
+    voiceVolumeSlider.setTomlValue(data, "Audio", "voiceVolumeSlider", is_game_specific);
+    sfxVolumeSlider.setTomlValue(data, "Audio", "sfxVolumeSlider", is_game_specific);
+    padSpkVolumeSlider.setTomlValue(data, "Audio", "padSpkVolumeSlider", is_game_specific);
+    trophyVolumeSlider.setTomlValue(data, "Audio", "trophyVolumeSlider", is_game_specific);
 
     windowWidth.setTomlValue(data, "GPU", "screenWidth", is_game_specific);
     windowHeight.setTomlValue(data, "GPU", "screenHeight", is_game_specific);
