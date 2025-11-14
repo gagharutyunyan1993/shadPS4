@@ -70,10 +70,20 @@ std::filesystem::path MntPoints::GetHostPath(std::string_view path, bool* is_rea
     // Remove device (e.g /app0) from path to retrieve relative path.
     const auto rel_path = std::string_view{corrected_path}.substr(mount->mount.size() + 1);
     std::filesystem::path host_path = mount->host_path / rel_path;
-    std::filesystem::path patch_path = mount->host_path;
+
+    // Construct patch path, handling base game folders with "-app" suffix
+    std::filesystem::path base_path = mount->host_path;
+    const auto base_path_str = base_path.string();
+
+    // If the base path ends with "-app", strip it to find the actual update folder
+    if (base_path_str.ends_with("-app")) {
+        base_path = base_path_str.substr(0, base_path_str.size() - 4);
+    }
+
+    std::filesystem::path patch_path = base_path;
     patch_path += "-UPDATE";
     if (!std::filesystem::exists(patch_path)) {
-        patch_path = mount->host_path;
+        patch_path = base_path;
         patch_path += "-patch";
     }
     patch_path /= rel_path;
