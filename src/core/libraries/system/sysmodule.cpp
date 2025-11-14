@@ -11,6 +11,7 @@
 #include "core/libraries/libs.h"
 #include "core/libraries/system/sysmodule.h"
 #include "core/libraries/system/system_error.h"
+#include "core/libraries/app_content/app_content.h"
 
 namespace Libraries::SysModule {
 
@@ -86,6 +87,20 @@ int PS4_SYSV_ABI sceSysmoduleIsLoadedInternal(OrbisSysModuleInternal id) {
 
 int PS4_SYSV_ABI sceSysmoduleLoadModule(OrbisSysModule id) {
     LOG_ERROR(Lib_SysModule, "(DUMMY) called module = {}", magic_enum::enum_name(id));
+
+    // Some modules require automatic initialization when loaded
+    if (id == OrbisSysModule::ORBIS_SYSMODULE_APP_CONTENT) {
+        // Automatically initialize AppContent to scan for DLC
+        // This is needed for games like The Binding of Isaac that don't manually
+        // call sceAppContentInitialize but expect DLC to be detected
+        static bool app_content_initialized = false;
+        if (!app_content_initialized) {
+            LOG_INFO(Lib_SysModule, "Auto-initializing AppContent for DLC detection");
+            AppContent::sceAppContentInitialize(nullptr, nullptr);
+            app_content_initialized = true;
+        }
+    }
+
     return ORBIS_OK;
 }
 
