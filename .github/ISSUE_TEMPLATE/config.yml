@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 blank_issues_enabled: false
 contact_links:
+  - name: QtLauncher (GUI) Issues
+    url: https://github.com/shadps4-emu/shadps4-qtlauncher/issues
+    about: Report bugs or request features for the QtLauncher graphical interface
   - name: Discord
     url: https://discord.gg/bFJxfftGW6
     about: Get direct support and hang out with us
